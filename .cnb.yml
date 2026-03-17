@@ -7,8 +7,3 @@ $:
       services:
         - vscode
         - docker
-      stages:
-        - name: Install rustlings
-          script: cargo install --locked --path .
-        - name: Start rustlings watch
-          script: echo "Run 'rustlings watch' in terminal to start"
