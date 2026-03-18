@@ -26,20 +26,15 @@ RUN apt-get update && apt-get install -y \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Rust
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+# Install Rust and related tools
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && \
+    export PATH="$HOME/.cargo/bin:$PATH" && \
+    rustup target add riscv64gc-unknown-none-elf && \
+    cargo install cargo-binutils && \
+    rustup component add llvm-tools-preview
 
 # Add Rust to PATH
 ENV PATH="$HOME/.cargo/bin:$PATH"
-
-# Install Rust target for RISC-V
-RUN rustup target add riscv64gc-unknown-none-elf
-
-# Install cargo-binutils
-RUN cargo install cargo-binutils
-
-# Install llvm-tools-preview
-RUN rustup component add llvm-tools-preview
 
 # Install Oh My Zsh
 RUN sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
