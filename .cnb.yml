@@ -7,3 +7,27 @@ $:
       services:
         - vscode
         - docker
+  push:
+    - docker:
+        image: alicesama/rcore-ci:2024a
+      stages:
+        - name: Run grading tests
+          script: |
+            qemu-system-riscv64 --version
+            rustup target add riscv64gc-unknown-none-elf
+            rm -rf ci-user
+            git clone https://github.com/LearningOS/rCore-Tutorial-Checker.git ci-user
+            git clone https://github.com/LearningOS/rCore-Tutorial-Test.git ci-user/user
+            ID=$(git rev-parse --abbrev-ref HEAD | grep -oP 'ch\K[0-9]')
+            cd ci-user && make test CHAPTER=$ID 2>&1 | tee ../output.txt
+            cat ../output.txt
+            POINTS=$(grep "Test passed" ../output.txt | grep -oP "\d+/\d+" | head -1)
+            echo "points=$POINTS"
+            if [ -z "$POINTS" ]; then echo "ERROR: No test results found"; exit 1; fi
+            GOT="${POINTS%%/*}"
+            TOTAL="${POINTS##*/}"
+            if [ "$GOT" != "$TOTAL" ]; then
+              echo "FAILED: points is not full score: $POINTS"
+              exit 1
+            fi
+            echo "PASSED: full score $POINTS"

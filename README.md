@@ -29,8 +29,8 @@
 ## Setup
 
 ```bash
-$ git clone https://github.com/LearningOS/2025a-rcore-[YOUR_USER_NAME].git
-$ cd 2025a-rcore-[YOUR_USER_NAME]
+$ git clone https://github.com/LearningOS/2026s-rcore-[YOUR_USER_NAME].git
+$ cd 2026s-rcore-[YOUR_USER_NAME]
 ```
 
 ## Build & Run
