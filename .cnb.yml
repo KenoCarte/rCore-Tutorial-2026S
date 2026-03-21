@@ -9,7 +9,8 @@ $:
         - docker
   push:
     - docker:
-        image: alicesama/rcore-ci:2024a
+        image: docker.cnb.cool/learningos/oscamp-2026s/rcore-tutorial-2026s
+      imports: https://cnb.cool/LearningOS/OSCamp-2026S/keys/-/blob/main/rcore-secrets.yml
       stages:
         - name: Run grading tests
           script: |
@@ -31,3 +32,14 @@ $:
               exit 1
             fi
             echo "PASSED: full score $POINTS"
+
+        - name: Post score to OpenCamp
+          script: |
+            ID=$(git rev-parse --abbrev-ref HEAD | grep -oP 'ch\K[0-9]')
+            echo "Uploading score for chapter $ID by user $CNB_BUILD_USER"
+            curl -X POST "https://api.opencamp.cn/web/api/courseRank/createByThirdToken" \
+              -H 'accept: application/json;charset=utf-8' \
+              -H 'Content-Type: application/json' \
+              -H "token: $RCORE_TOKEN" \
+              -d "{\"channel\": \"cnb\", \"courseId\": $RCORE_COURSE_ID, \"ext\": \"{\\\"chapter\\\": \\\"ch${ID}\\\"}\", \"name\": \"$CNB_BUILD_USER\", \"score\": 100, \"totalScore\": 100}" \
+              --fail --show-error
