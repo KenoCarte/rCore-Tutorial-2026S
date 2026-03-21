@@ -7,19 +7,31 @@ $:
       services:
         - vscode
         - docker
-  push:
+
+  # 评测触发: 向本仓库的 chN 分支提 PR 时自动运行测试并上传分数
+  pull_request.target:
     - docker:
         image: docker.cnb.cool/learningos/oscamp-2026s/rcore-tutorial-2026s
       imports: https://cnb.cool/LearningOS/OSCamp-2026S/keys/-/blob/main/rcore-secrets.yml
       stages:
+        - name: Fetch PR code
+          script: |
+            # Save chapter ID before detaching HEAD
+            ID=$(git rev-parse --abbrev-ref HEAD | grep -oP 'ch\K[0-9]')
+            echo "$ID" > /tmp/chapter_id
+            echo "Chapter: $ID"
+            git remote add source ${CNB_WEB_ENDPOINT}/${CNB_PULL_REQUEST_SLUG}.git
+            git fetch source $CNB_PULL_REQUEST_BRANCH
+            git checkout -f $CNB_PULL_REQUEST_SHA
+
         - name: Run grading tests
           script: |
+            ID=$(cat /tmp/chapter_id)
             qemu-system-riscv64 --version
             rustup target add riscv64gc-unknown-none-elf
             rm -rf ci-user
             git clone https://github.com/LearningOS/rCore-Tutorial-Checker.git ci-user
             git clone https://github.com/LearningOS/rCore-Tutorial-Test.git ci-user/user
-            ID=$(git rev-parse --abbrev-ref HEAD | grep -oP 'ch\K[0-9]')
             cd ci-user && make test CHAPTER=$ID 2>&1 | tee ../output.txt
             cat ../output.txt
             POINTS=$(grep "Test passed" ../output.txt | grep -oP "\d+/\d+" | head -1)
@@ -35,7 +47,7 @@ $:
 
         - name: Post score to OpenCamp
           script: |
-            ID=$(git rev-parse --abbrev-ref HEAD | grep -oP 'ch\K[0-9]')
+            ID=$(cat /tmp/chapter_id)
             echo "Uploading score for chapter $ID by user $CNB_BUILD_USER"
             curl -X POST "https://api.opencamp.cn/web/api/courseRank/createByThirdToken" \
               -H 'accept: application/json;charset=utf-8' \
