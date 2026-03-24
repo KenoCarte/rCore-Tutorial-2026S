@@ -65,23 +65,25 @@ RUN rustup --version && \
     cargo --version && \
     rustc --version
 
-# 2.3 Env
-RUN cargo install cargo-binutils; \
-    rustup target add riscv64gc-unknown-none-elf; \
-    rustup component add rust-src; \
-    rustup component add llvm-tools-preview; \
-    rustup component add rustfmt; \
-    rustup component add clippy;
-
-
 # Install Rust components and tools for rCore development
 RUN rustup default $RUST_VERSION; \
-    cargo install cargo-binutils; \
+    cargo install cargo-binutils --version "=0.3.6" --locked; \
     rustup target add riscv64gc-unknown-none-elf; \
     rustup component add rust-src; \
     rustup component add llvm-tools-preview; \
     rustup component add rustfmt; \
     rustup component add clippy;
+
+# Install code-server and VS Code extensions
+RUN curl -fsSL https://code-server.dev/install.sh | sh && \
+    code-server --install-extension cnbcool.cnb-welcome && \
+    code-server --install-extension redhat.vscode-yaml && \
+    code-server --install-extension waderyan.gitblame && \
+    code-server --install-extension mhutchie.git-graph && \
+    code-server --install-extension donjayamanne.githistory && \
+    code-server --install-extension cloudstudio.live-server && \
+    code-server --install-extension tencent-cloud.coding-copilot && \
+    code-server --install-extension rust-lang.rust-analyzer
 
 # Set working directory
 WORKDIR /root
