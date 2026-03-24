@@ -3,7 +3,7 @@ $:
     - runner:
         cpus: 16
       docker:
-        image: docker.cnb.cool/learningos/oscamp-2026s/rustlings
+        image: docker.cnb.cool/learningos/rcore-single
       services:
         - vscode
         - docker
