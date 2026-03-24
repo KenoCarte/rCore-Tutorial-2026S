@@ -21,12 +21,10 @@ $:
             echo "Chapter: $ID"
             qemu-system-riscv64 --version
             rustup target add riscv64gc-unknown-none-elf
-            cargo install cargo-binutils --version "=0.3.6" --locked
-            rustup component add rust-src llvm-tools-preview
             rm -rf ci-user
             git clone https://github.com/LearningOS/rCore-Tutorial-Checker.git ci-user
             git clone https://github.com/LearningOS/rCore-Tutorial-Test.git ci-user/user
-            cd ci-user && make test CHAPTER=$ID OFFLINE=1 2>&1 | tee ../output.txt
+            cd ci-user && make test CHAPTER=$ID 2>&1 | tee ../output.txt
             cat ../output.txt
             POINTS=$(grep "Test passed" ../output.txt | grep -oP "\d+/\d+" | head -1)
             echo "points=$POINTS"
@@ -116,12 +114,10 @@ $:
             ID=$(cat /tmp/chapter_id)
             qemu-system-riscv64 --version
             rustup target add riscv64gc-unknown-none-elf
-            cargo install cargo-binutils --version "=0.3.6" --locked
-            rustup component add rust-src llvm-tools-preview
             rm -rf ci-user
             git clone https://github.com/LearningOS/rCore-Tutorial-Checker.git ci-user
             git clone https://github.com/LearningOS/rCore-Tutorial-Test.git ci-user/user
-            cd ci-user && make test CHAPTER=$ID OFFLINE=1 2>&1 | tee ../output.txt
+            cd ci-user && make test CHAPTER=$ID 2>&1 | tee ../output.txt
             cat ../output.txt
             POINTS=$(grep "Test passed" ../output.txt | grep -oP "\d+/\d+" | head -1)
             echo "points=$POINTS"
