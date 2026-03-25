@@ -78,12 +78,17 @@ $:
             echo "User $USER chapters: $(cat $USERFILE) => score=$SCORE/500"
 
             git add "$USERFILE"
-            git commit -m "ch${ID} passed by $USER"
 
-            # 带重试的 push（防并发冲突）
-            for i in 1 2 3; do
-              git pull --rebase origin records && git push origin HEAD:records && break || sleep 3
-            done
+            # 检查是否有变更（防止重复提交同一章节导致失败）
+            if git diff --cached --quiet; then
+              echo "Chapter $ID already passed, skipping commit and push"
+            else
+              git commit -m "ch${ID} passed by $USER"
+              # 带重试的 push（防并发冲突）
+              for i in 1 2 3; do
+                git pull --rebase origin records && git push origin HEAD:records && break || sleep 3
+              done
+            fi
 
             cd ..
 
@@ -174,12 +179,17 @@ $:
             echo "User $USER chapters: $(cat $USERFILE) => score=$SCORE/500"
 
             git add "$USERFILE"
-            git commit -m "ch${ID} passed by $USER"
 
-            # 带重试的 push（防并发冲突）
-            for i in 1 2 3; do
-              git pull --rebase origin records && git push origin HEAD:records && break || sleep 3
-            done
+            # 检查是否有变更（防止重复提交同一章节导致失败）
+            if git diff --cached --quiet; then
+              echo "Chapter $ID already passed, skipping commit and push"
+            else
+              git commit -m "ch${ID} passed by $USER"
+              # 带重试的 push（防并发冲突）
+              for i in 1 2 3; do
+                git pull --rebase origin records && git push origin HEAD:records && break || sleep 3
+              done
+            fi
 
             cd ..
 
