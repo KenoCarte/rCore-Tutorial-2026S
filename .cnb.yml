@@ -26,7 +26,7 @@ $:
             git clone https://github.com/LearningOS/rCore-Tutorial-Test.git ci-user/user
             cd ci-user && make test CHAPTER=$ID 2>&1 | tee ../output.txt
             cat ../output.txt
-            POINTS=$(grep "Test passed" ../output.txt | grep -oP "\d+/\d+" | head -1)
+            POINTS=$(grep -a "Test passed" ../output.txt | grep -aoP "\d+/\d+" | tail -1)
             echo "points=$POINTS"
             if [ -z "$POINTS" ]; then echo "ERROR: No test results found"; exit 1; fi
             GOT="${POINTS%%/*}"
@@ -127,7 +127,7 @@ $:
             git clone https://github.com/LearningOS/rCore-Tutorial-Test.git ci-user/user
             cd ci-user && make test CHAPTER=$ID 2>&1 | tee ../output.txt
             cat ../output.txt
-            POINTS=$(grep "Test passed" ../output.txt | grep -oP "\d+/\d+" | head -1)
+            POINTS=$(grep -a "Test passed" ../output.txt | grep -aoP "\d+/\d+" | tail -1)
             echo "points=$POINTS"
             if [ -z "$POINTS" ]; then echo "ERROR: No test results found"; exit 1; fi
             GOT="${POINTS%%/*}"
