@@ -21,6 +21,8 @@ use alloc::vec::Vec;
 use lazy_static::*;
 use switch::__switch;
 pub use task::{TaskControlBlock, TaskStatus};
+/// maximum syscall number tracked per task
+pub const MAX_SYSCALL_NUM: usize = 512;
 
 pub use context::TaskContext;
 
@@ -153,6 +155,35 @@ impl TaskManager {
             panic!("All applications completed!");
         }
     }
+
+    /// Increment syscall count and return the new value
+    fn increase_syscall_count(&self, syscall_id: usize) -> usize {
+        let mut inner = self.inner.exclusive_access();
+        let cur = inner.current_task;
+        inner.tasks[cur].syscall_counts[syscall_id] += 1;
+        inner.tasks[cur].syscall_counts[syscall_id]
+    }
+
+    /// Query syscall count for current task
+    fn get_syscall_count(&self, syscall_id: usize) -> usize {
+        let inner = self.inner.exclusive_access();
+        let cur = inner.current_task;
+        inner.tasks[cur].syscall_counts[syscall_id]
+    }
+
+    /// mmap memory for current task
+    fn mmap_current(&self, start: usize, len: usize, prot: usize) -> isize {
+        let mut inner = self.inner.exclusive_access();
+        let cur = inner.current_task;
+        inner.tasks[cur].memory_set.mmap(start.into(), len, prot)
+    }
+
+    /// munmap memory for current task
+    fn munmap_current(&self, start: usize, len: usize) -> isize {
+        let mut inner = self.inner.exclusive_access();
+        let cur = inner.current_task;
+        inner.tasks[cur].memory_set.munmap(start.into(), len)
+    }
 }
 
 /// Run the first task in task list.
@@ -201,4 +232,24 @@ pub fn current_trap_cx() -> &'static mut TrapContext {
 /// Change the current 'Running' task's program break
 pub fn change_program_brk(size: i32) -> Option<usize> {
     TASK_MANAGER.change_current_program_brk(size)
+}
+
+/// Increment syscall count for the current task and return the new value.
+pub fn increase_syscall_count(syscall_id: usize) -> usize {
+    TASK_MANAGER.increase_syscall_count(syscall_id)
+}
+
+/// Get the current task's syscall invocation count for `syscall_id`.
+pub fn get_syscall_count(syscall_id: usize) -> usize {
+    TASK_MANAGER.get_syscall_count(syscall_id)
+}
+
+/// mmap memory for the current task.
+pub fn mmap_current(start: usize, len: usize, prot: usize) -> isize {
+    TASK_MANAGER.mmap_current(start, len, prot)
+}
+
+/// munmap memory for the current task.
+pub fn munmap_current(start: usize, len: usize) -> isize {
+    TASK_MANAGER.munmap_current(start, len)
 }

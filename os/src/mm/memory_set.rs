@@ -68,6 +68,32 @@ impl MemorySet {
         if let Some(data) = data {
             map_area.copy_data(&mut self.page_table, data);
         }
+        if let Some(idx) = self.areas.iter().position(|area| {
+            area.vpn_range.get_end() == map_area.vpn_range.get_start()
+                && area.map_perm == map_area.map_perm
+        }) {
+            let left_area = self.areas.remove(idx);
+            map_area.vpn_range = VPNRange::new(
+                left_area.vpn_range.get_start(),
+                map_area.vpn_range.get_end(),
+            );
+            for (vpn, frame) in left_area.data_frames {
+                map_area.data_frames.insert(vpn, frame);
+            }
+        }
+        if let Some(idx) = self.areas.iter().position(|area| {
+            area.vpn_range.get_start() == map_area.vpn_range.get_end()
+                && area.map_perm == map_area.map_perm
+        }) {
+            let right_area = self.areas.remove(idx);
+            map_area.vpn_range = VPNRange::new(
+                map_area.vpn_range.get_start(),
+                right_area.vpn_range.get_end(),
+            );
+            for (vpn, frame) in right_area.data_frames {
+                map_area.data_frames.insert(vpn, frame);
+            }
+        }
         self.areas.push(map_area);
     }
     /// Mention that trampoline is not collected by areas.
@@ -195,16 +221,16 @@ impl MemorySet {
             ),
             None,
         );
-        // used in sbrk
-        memory_set.push(
-            MapArea::new(
-                user_stack_top.into(),
-                user_stack_top.into(),
-                MapType::Framed,
-                MapPermission::R | MapPermission::W | MapPermission::U,
-            ),
-            None,
-        );
+        // used in sbrk — push directly to areas to avoid being merged with
+        // the user stack area by push() (they share the same permissions and
+        // are adjacent; merging would lose the distinct start VPN that
+        // append_to / shrink_to depend on).
+        memory_set.areas.push(MapArea::new(
+            user_stack_top.into(),
+            user_stack_top.into(),
+            MapType::Framed,
+            MapPermission::R | MapPermission::W | MapPermission::U,
+        ));
         // map TrapContext
         memory_set.push(
             MapArea::new(
@@ -260,6 +286,91 @@ impl MemorySet {
             true
         } else {
             false
+        }
+    }
+    /// check if a vpn range overlaps with any existing area
+    fn is_overlap(&self, vpn_range: &VPNRange) -> bool {
+        self.areas.iter().any(|area| {
+            let ar = &area.vpn_range;
+            if ar.get_start() == ar.get_end() {
+                return false;
+            }
+            ar.get_start().0.max(vpn_range.get_start().0)
+                < ar.get_end().0.min(vpn_range.get_end().0)
+        })
+    }
+    /// mmap a region of virtual memory for the calling process.
+    ///
+    /// `start` must be page-aligned, `len` > 0.
+    /// `prot` uses bit0=R, bit1=W, bit2=X (the `U` flag is always set).
+    /// Returns 0 on success, -1 on invalid arguments or conflict.
+    pub fn mmap(&mut self, start: VirtAddr, len: usize, prot: usize) -> isize {
+        if !start.aligned() || len == 0 || (prot & (!0x7)) != 0 || prot & (0x7) == 0 {
+            return -1;
+        }
+        let end: VirtAddr = (((start.0 + len - 1) & !(PAGE_SIZE - 1)) + PAGE_SIZE).into();
+        let rg = VPNRange::new(start.floor(), end.ceil());
+        if self.is_overlap(&rg) {
+            return -1;
+        }
+        let mut map_perm = MapPermission::U;
+        if prot & 0b001 != 0 {
+            map_perm |= MapPermission::R;
+        }
+        if prot & 0b010 != 0 {
+            map_perm |= MapPermission::W;
+        }
+        if prot & 0b100 != 0 {
+            map_perm |= MapPermission::X;
+        }
+        self.push(MapArea::new(start, end, MapType::Framed, map_perm), None);
+        0
+    }
+    /// munmap a region of virtual memory previously created with `mmap`.
+    ///
+    /// `start` must be page-aligned, and the exact range must match an existing
+    /// area (including sizes rounded up to the page boundary by `mmap`).
+    /// Returns 0 on success, -1 if the range cannot be unmapped.
+    pub fn munmap(&mut self, start: VirtAddr, len: usize) -> isize {
+        if !start.aligned() || len == 0 {
+            return -1;
+        }
+        let end: VirtAddr = (((start.0 + len - 1) & !(PAGE_SIZE - 1)) + PAGE_SIZE).into();
+        let rg = VPNRange::new(start.floor(), end.ceil());
+        if let Some(idx) = self.areas.iter().position(|area| {
+            let ar = &area.vpn_range;
+            if ar.get_start() == ar.get_end() {
+                return false;
+            }
+            ar.get_start() <= rg.get_start() && ar.get_end() >= rg.get_end()
+        }) {
+            let area = &mut self.areas[idx];
+            if area.vpn_range.get_start() == rg.get_start()
+                && area.vpn_range.get_end() == rg.get_end()
+            {
+                area.unmap(&mut self.page_table);
+                self.areas.remove(idx);
+            } else if area.vpn_range.get_start() == rg.get_start() {
+                for vpn in VPNRange::new(rg.get_start(), rg.get_end()) {
+                    area.unmap_one(&mut self.page_table, vpn);
+                }
+                area.vpn_range = VPNRange::new(rg.get_end(), area.vpn_range.get_end());
+            } else if area.vpn_range.get_end() == rg.get_end() {
+                for vpn in VPNRange::new(rg.get_start(), rg.get_end()) {
+                    area.unmap_one(&mut self.page_table, vpn);
+                }
+                area.vpn_range = VPNRange::new(area.vpn_range.get_start(), rg.get_start());
+            } else {
+                for vpn in VPNRange::new(rg.get_start(), rg.get_end()) {
+                    area.unmap_one(&mut self.page_table, vpn);
+                }
+                let right_area = area.split_right(rg.get_end());
+                area.vpn_range = VPNRange::new(area.vpn_range.get_start(), rg.get_start());
+                self.areas.push(right_area);
+            }
+            0
+        } else {
+            -1
         }
     }
 }
@@ -354,6 +465,17 @@ impl MapArea {
                 break;
             }
             current_vpn.step();
+        }
+    }
+    pub(super) fn split_right(&mut self, split_vpn: VirtPageNum) -> Self {
+        let old_end = self.vpn_range.get_end();
+        let right_frames = self.data_frames.split_off(&split_vpn);
+        self.vpn_range = VPNRange::new(self.vpn_range.get_start(), split_vpn);
+        Self {
+            vpn_range: VPNRange::new(split_vpn, old_end),
+            data_frames: right_frames,
+            map_type: self.map_type,
+            map_perm: self.map_perm,
         }
     }
 }
