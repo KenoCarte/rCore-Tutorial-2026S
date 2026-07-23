@@ -68,6 +68,8 @@ pub struct TaskControlBlockInner {
 
     /// Program break
     pub program_brk: usize,
+
+    pub priority: isize,
 }
 
 impl TaskControlBlockInner {
@@ -118,6 +120,7 @@ impl TaskControlBlock {
                     exit_code: 0,
                     heap_bottom: user_sp,
                     program_brk: user_sp,
+                    priority: 16,
                 })
             },
         };
@@ -191,6 +194,7 @@ impl TaskControlBlock {
                     exit_code: 0,
                     heap_bottom: parent_inner.heap_bottom,
                     program_brk: parent_inner.program_brk,
+                    priority: parent_inner.priority,
                 })
             },
         });
@@ -235,6 +239,23 @@ impl TaskControlBlock {
         } else {
             None
         }
+    }
+
+    /// Get the current process's priority.
+    pub fn get_priority(&self) -> isize {
+        self.inner_exclusive_access().priority
+    }
+
+    /// Set the current process's priority. Returns the old priority on success,
+    /// -1 if `prio` is invalid (must be >= 2).
+    pub fn set_priority(&self, prio: isize) -> isize {
+        if prio < 2 {
+            return -1;
+        }
+        let mut inner = self.inner_exclusive_access();
+        let old = inner.priority;
+        inner.priority = prio;
+        old
     }
 }
 
