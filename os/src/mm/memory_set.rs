@@ -318,6 +318,66 @@ impl MemorySet {
             false
         }
     }
+
+    fn is_overlap(&self, vpn_range: &VPNRange) -> bool {
+        self.areas.iter().any(|area| {
+            let ar = &area.vpn_range;
+            if ar.get_start() == ar.get_end() {
+                return false;
+            }
+            ar.get_start().0.max(vpn_range.get_start().0)
+                < ar.get_end().0.min(vpn_range.get_end().0)
+        })
+    }
+
+    /// mmap a region of virtual memory for the calling process.
+    pub fn mmap(&mut self, start: VirtAddr, len: usize, prot: usize) -> isize {
+        if !start.aligned() || len == 0 || (prot & !0x7) != 0 || prot & 0x7 == 0 {
+            return -1;
+        }
+        let end: VirtAddr = (((start.0 + len - 1) & !(PAGE_SIZE - 1)) + PAGE_SIZE).into();
+        let rg = VPNRange::new(start.floor(), end.ceil());
+        if self.is_overlap(&rg) {
+            return -1;
+        }
+        let mut perm = MapPermission::U;
+        if prot & 1 != 0 {
+            perm |= MapPermission::R;
+        }
+        if prot & 2 != 0 {
+            perm |= MapPermission::W;
+        }
+        if prot & 4 != 0 {
+            perm |= MapPermission::X;
+        }
+        self.push(MapArea::new(start, end, MapType::Framed, perm), None);
+        0
+    }
+
+    /// munmap a region of virtual memory previously created with `mmap`.
+    pub fn munmap(&mut self, start: VirtAddr, len: usize) -> isize {
+        if !start.aligned() || len == 0 {
+            return -1;
+        }
+        let end: VirtAddr = (((start.0 + len - 1) & !(PAGE_SIZE - 1)) + PAGE_SIZE).into();
+        let target_start = start.floor();
+        let target_end = end.ceil();
+        if let Some(idx) = self
+            .areas
+            .iter()
+            .position(|area| area.vpn_range.get_start() == target_start)
+        {
+            if self.areas[idx].vpn_range.get_end() != target_end {
+                return -1;
+            }
+            let area = &mut self.areas[idx];
+            area.unmap(&mut self.page_table);
+            self.areas.remove(idx);
+            0
+        } else {
+            -1
+        }
+    }
 }
 /// map area structure, controls a contiguous piece of virtual memory
 pub struct MapArea {

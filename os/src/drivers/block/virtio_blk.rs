@@ -38,9 +38,19 @@ impl VirtIOBlock {
     /// Create a new VirtIOBlock driver with VIRTIO0 base_addr for virtio_blk device
     pub fn new() -> Self {
         unsafe {
-            Self(UPSafeCell::new(
-                VirtIOBlk::<VirtioHal>::new(&mut *(VIRTIO0 as *mut VirtIOHeader)).unwrap(),
-            ))
+            // Scan all 8 virtio MMIO slots for a block device (type 2)
+            for slot in 0..8 {
+                let base = (VIRTIO0 + slot * 0x1000) as *const u32;
+                let magic = base.read_volatile();
+                let device_id = base.add(2).read_volatile();
+                if magic == 0x74726976 && device_id == 2 {
+                    let header = &mut *((VIRTIO0 + slot * 0x1000) as *mut VirtIOHeader);
+                    return Self(UPSafeCell::new(
+                        VirtIOBlk::<VirtioHal>::new(header).unwrap(),
+                    ));
+                }
+            }
+            panic!("[virtio] no block device found in any MMIO slot!");
         }
     }
 }

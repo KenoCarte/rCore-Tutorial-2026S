@@ -61,12 +61,29 @@ disasm-vim: kernel
 
 run: run-inner
 
+FS_IMG := ../user/target/$(TARGET)/$(MODE)/fs.img
+
+$(FS_IMG):
+	@cd ../easy-fs-fuse && cargo build --release 2>/dev/null && \
+	./target/release/easy-fs-fuse -s ../user/src/bin/ -t ../user/target/$(TARGET)/$(MODE)/
+
 run-inner: build
-	@qemu-system-riscv64 \
-		-machine virt \
-		-nographic \
-		-bios $(BOOTLOADER) \
-		-device loader,file=$(KERNEL_BIN),addr=$(KERNEL_ENTRY_PA)
+	@if [ $(CHAPTER) -ge 6 ]; then $(MAKE) $(FS_IMG) ; fi
+	@if [ $(CHAPTER) -ge 6 ]; then \
+		qemu-system-riscv64 \
+			-machine virt \
+			-nographic \
+			-bios $(BOOTLOADER) \
+			-device loader,file=$(KERNEL_BIN),addr=$(KERNEL_ENTRY_PA) \
+			-drive file=$(FS_IMG),if=none,format=raw,id=x0 \
+			-device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0 ; \
+	else \
+		qemu-system-riscv64 \
+			-machine virt \
+			-nographic \
+			-bios $(BOOTLOADER) \
+			-device loader,file=$(KERNEL_BIN),addr=$(KERNEL_ENTRY_PA) ; \
+	fi
 
 debug: build
 	@tmux new-session -d \

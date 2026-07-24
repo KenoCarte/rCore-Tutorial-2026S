@@ -53,6 +53,18 @@ impl OSInode {
         }
         v
     }
+    /// Get the inner inode
+    pub fn ino(&self) -> u32 {
+        self.inner.exclusive_access().inode.ino()
+    }
+    /// get the number of links to the inode
+    pub fn nlink(&self) -> u32 {
+        self.inner.exclusive_access().inode.nlink()
+    }
+    /// check if the inode is a directory
+    pub fn is_dir(&self) -> bool {
+        self.inner.exclusive_access().inode.is_dir()
+    }
 }
 
 lazy_static! {
@@ -69,6 +81,16 @@ pub fn list_apps() {
         println!("{}", app);
     }
     println!("**************/");
+}
+
+/// Create a nlink
+pub fn link_file(old_name: &str, new_name: &str) -> Option<()> {
+    ROOT_INODE.link(new_name, ROOT_INODE.find(old_name)?.ino())
+}
+
+/// Delete a nlink
+pub fn unlink_file(name: &str) -> Option<()> {
+    ROOT_INODE.unlink(name).map(|_| ())
 }
 
 bitflags! {
@@ -155,5 +177,14 @@ impl File for OSInode {
             total_write_size += write_size;
         }
         total_write_size
+    }
+    fn ino(&self) -> u32 {
+        self.inner.exclusive_access().inode.ino()
+    }
+    fn nlink(&self) -> u32 {
+        self.inner.exclusive_access().inode.nlink()
+    }
+    fn is_dir(&self) -> bool {
+        self.inner.exclusive_access().inode.is_dir()
     }
 }

@@ -15,6 +15,18 @@ pub trait File: Send + Sync {
     fn read(&self, buf: UserBuffer) -> usize;
     /// write to the file from buf, return the number of bytes written
     fn write(&self, buf: UserBuffer) -> usize;
+    /// get the inode number
+    fn ino(&self) -> u32 {
+        0
+    }
+    /// get the number of hard links
+    fn nlink(&self) -> u32 {
+        0
+    }
+    /// whether this file is a directory
+    fn is_dir(&self) -> bool {
+        false
+    }
 }
 
 /// The stat of a inode
@@ -46,5 +58,5 @@ bitflags! {
     }
 }
 
-pub use inode::{list_apps, open_file, OSInode, OpenFlags};
+pub use inode::{link_file, list_apps, open_file, unlink_file, OSInode, OpenFlags};
 pub use stdio::{Stdin, Stdout};
