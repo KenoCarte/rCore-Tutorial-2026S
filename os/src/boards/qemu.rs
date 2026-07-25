@@ -7,6 +7,7 @@ const EXIT_FAILURE_FLAG: u32 = 0x3333;
 const EXIT_FAILURE: u32 = exit_code_encode(1); // Equals `exit(1)`. qemu failed exit
 const EXIT_RESET: u32 = 0x7777; // qemu reset
 
+/// Exit QEMU with a given exit code
 pub trait QEMUExit {
     /// Exit with specified return code.
     ///
@@ -76,4 +77,5 @@ impl QEMUExit for RISCV64 {
 
 const VIRT_TEST: u64 = 0x100000;
 
+/// Global QEMU exit handle for the RISC-V virt machine
 pub const QEMU_EXIT_HANDLE: RISCV64 = RISCV64::new(VIRT_TEST);

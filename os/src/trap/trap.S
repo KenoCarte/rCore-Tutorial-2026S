@@ -67,3 +67,25 @@ __restore:
     # back to user stack
     ld sp, 2*8(sp)
     sret
+
+    .section .text
+    .globl __trap_from_kernel
+    .align 2
+__trap_from_kernel:
+    # save all registers to kernel stack
+    addi sp, sp, -34*8
+    sd x1, 1*8(sp)
+    sd x3, 3*8(sp)
+    .set n, 5
+    .rept 27
+        SAVE_GP %n
+        .set n, n+1
+    .endr
+    csrr t0, sstatus
+    csrr t1, sepc
+    sd t0, 32*8(sp)
+    sd t1, 33*8(sp)
+    # call Rust trap_from_kernel()
+    call trap_from_kernel
+    # not reached — trap_from_kernel panics
+    j __trap_from_kernel

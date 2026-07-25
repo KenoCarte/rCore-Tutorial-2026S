@@ -34,6 +34,8 @@ extern crate alloc;
 
 #[macro_use]
 mod console;
+/// Board-specific configurations (e.g., QEMU)
+pub mod boards;
 pub mod config;
 pub mod drivers;
 pub mod fs;
