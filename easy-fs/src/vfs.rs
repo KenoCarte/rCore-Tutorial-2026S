@@ -6,7 +6,7 @@ use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use spin::{Mutex, MutexGuard};
-/// Virtual filesystem layer over easy-fs
+
 pub struct Inode {
     block_id: usize,
     block_offset: usize,
@@ -33,19 +33,19 @@ impl Inode {
             ino,
         }
     }
-    /// Call a function over a disk inode to read it
+
     fn read_disk_inode<V>(&self, f: impl FnOnce(&DiskInode) -> V) -> V {
         get_block_cache(self.block_id, Arc::clone(&self.block_device))
             .lock()
             .read(self.block_offset, f)
     }
-    /// Call a function over a disk inode to modify it
+
     fn modify_disk_inode<V>(&self, f: impl FnOnce(&mut DiskInode) -> V) -> V {
         get_block_cache(self.block_id, Arc::clone(&self.block_device))
             .lock()
             .modify(self.block_offset, f)
     }
-    /// Find inode under a disk inode by name
+
     fn find_inode_id(&self, name: &str, disk_inode: &DiskInode) -> Option<u32> {
         // assert it is a directory
         assert!(disk_inode.is_dir());
@@ -62,7 +62,7 @@ impl Inode {
         }
         None
     }
-    /// Find inode under current inode by name
+
     pub fn find(&self, name: &str) -> Option<Arc<Inode>> {
         let fs = self.fs.lock();
         self.read_disk_inode(|disk_inode| {
@@ -78,7 +78,7 @@ impl Inode {
             })
         })
     }
-    /// Increase the size of a disk inode
+
     fn increase_size(
         &self,
         new_size: u32,
@@ -95,16 +95,16 @@ impl Inode {
         }
         disk_inode.increase_size(new_size, v, &self.block_device);
     }
-    /// Create inode under current inode by name
+
     pub fn create(&self, name: &str) -> Option<Arc<Inode>> {
         let mut fs = self.fs.lock();
-        let op = |root_inode: &DiskInode| {
+        let op = |root_inode: &mut DiskInode| {
             // assert it is a directory
             assert!(root_inode.is_dir());
             // has the file been created?
             self.find_inode_id(name, root_inode)
         };
-        if self.read_disk_inode(op).is_some() {
+        if self.modify_disk_inode(op).is_some() {
             return None;
         }
         // create a new file
@@ -134,7 +134,6 @@ impl Inode {
 
         let (block_id, block_offset) = fs.get_disk_inode_pos(new_inode_id);
         block_cache_sync_all();
-        // return inode
         Some(Arc::new(Self::new(
             block_id,
             block_offset,
@@ -142,9 +141,8 @@ impl Inode {
             self.block_device.clone(),
             new_inode_id,
         )))
-        // release efs lock automatically by compiler
     }
-    /// List inodes under current inode
+
     pub fn ls(&self) -> Vec<String> {
         let _fs = self.fs.lock();
         self.read_disk_inode(|disk_inode| {
@@ -161,12 +159,12 @@ impl Inode {
             v
         })
     }
-    /// Read data from current inode
+
     pub fn read_at(&self, offset: usize, buf: &mut [u8]) -> usize {
         let _fs = self.fs.lock();
         self.read_disk_inode(|disk_inode| disk_inode.read_at(offset, buf, &self.block_device))
     }
-    /// Write data to current inode
+
     pub fn write_at(&self, offset: usize, buf: &[u8]) -> usize {
         let mut fs = self.fs.lock();
         let size = self.modify_disk_inode(|disk_inode| {
@@ -176,7 +174,7 @@ impl Inode {
         block_cache_sync_all();
         size
     }
-    /// Clear the data in current inode
+
     pub fn clear(&self) {
         let mut fs = self.fs.lock();
         self.modify_disk_inode(|disk_inode| {
@@ -189,18 +187,22 @@ impl Inode {
         });
         block_cache_sync_all();
     }
+
     /// Get the number of links to current inode
     pub fn nlink(&self) -> u32 {
         self.read_disk_inode(|disk_inode| disk_inode.nlink)
     }
+
     /// Check if current inode is a directory
     pub fn is_dir(&self) -> bool {
         self.read_disk_inode(|disk_inode| disk_inode.is_dir())
     }
+
     /// Get the inode id of current inode
     pub fn ino(&self) -> u32 {
         self.ino
     }
+
     /// Create a nlink to current inode
     pub fn link(&self, name: &str, target_ino: u32) -> Option<()> {
         let mut fs = self.fs.lock();
@@ -231,6 +233,7 @@ impl Inode {
         block_cache_sync_all();
         Some(())
     }
+
     /// Remove a nlink to current inode
     pub fn unlink(&self, name: &str) -> Option<u32> {
         let mut fs = self.fs.lock();

@@ -1,6 +1,7 @@
 //! File trait & inode(dir, file, pipe, stdin, stdout)
 
 mod inode;
+mod pipe;
 mod stdio;
 
 use crate::mm::UserBuffer;
@@ -59,4 +60,5 @@ bitflags! {
 }
 
 pub use inode::{link_file, list_apps, open_file, unlink_file, OSInode, OpenFlags};
+pub use pipe::{make_pipe, Pipe};
 pub use stdio::{Stdin, Stdout};
